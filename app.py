@@ -68,12 +68,12 @@ def inject_styles() -> None:
             @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap');
 
             :root {
-                --bg: #090a08;
-                --panel: #10120f;
-                --panel-2: #151813;
-                --line: rgba(232, 238, 222, 0.1);
-                --text: #f3f5ed;
-                --muted: #98a090;
+                --bg: #080807;
+                --panel: #11130f;
+                --panel-2: #181b14;
+                --line: rgba(242, 238, 218, 0.12);
+                --text: #f7f2df;
+                --muted: #a8a38f;
                 --green: #85ff4c;
                 --teal: #3ff5d5;
                 --amber: #ffbf38;
@@ -85,16 +85,26 @@ def inject_styles() -> None:
 
             .stApp {
                 background:
-                    linear-gradient(180deg, rgba(133,255,76,0.035), rgba(9,10,8,0) 220px),
-                    repeating-linear-gradient(0deg, rgba(255,255,255,0.018) 0, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 54px),
+                    linear-gradient(180deg, rgba(255,191,56,0.07), rgba(8,8,7,0) 260px),
+                    repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 62px),
                     var(--bg);
                 color: var(--text);
                 font-family: "IBM Plex Sans", sans-serif;
             }
 
+            header[data-testid="stHeader"],
+            div[data-testid="stToolbar"],
+            div[data-testid="stDecoration"],
+            div[data-testid="stStatusWidget"],
+            #MainMenu,
+            footer {
+                display: none !important;
+                visibility: hidden !important;
+            }
+
             .block-container {
                 max-width: 1440px;
-                padding-top: 2.3rem;
+                padding-top: 4rem;
                 padding-bottom: 2.4rem;
             }
 
@@ -118,14 +128,19 @@ def inject_styles() -> None:
                 justify-content: space-between;
                 gap: 1.5rem;
                 align-items: flex-end;
-                padding-bottom: 0.9rem;
-                margin-bottom: 0.8rem;
-                border-bottom: 1px solid var(--line);
+                padding: 1.05rem 1.1rem 1rem 1.1rem;
+                margin-bottom: 0.85rem;
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                background:
+                    linear-gradient(135deg, rgba(255,191,56,0.12), transparent 38%),
+                    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
+                    #10110e;
             }
 
             .app-title {
                 font-family: "Rajdhani", sans-serif;
-                font-size: 3rem;
+                font-size: 3.35rem;
                 line-height: 0.95;
                 color: var(--text);
                 text-transform: uppercase;
@@ -151,7 +166,7 @@ def inject_styles() -> None:
                 align-items: center;
                 min-height: 28px;
                 border: 1px solid var(--line);
-                background: rgba(255,255,255,0.035);
+                background: rgba(8,8,7,0.36);
                 color: rgba(243,245,237,0.78);
                 border-radius: 6px;
                 padding: 0.28rem 0.55rem;
@@ -161,10 +176,12 @@ def inject_styles() -> None:
 
             .games-band {
                 border: 1px solid var(--line);
-                border-radius: 8px;
-                background: rgba(16,18,15,0.82);
-                padding: 0.75rem;
-                margin-bottom: 1rem;
+                border-radius: 10px;
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01)),
+                    #10120f;
+                padding: 0.85rem;
+                margin-bottom: 1.05rem;
             }
 
             .games-head {
@@ -178,7 +195,7 @@ def inject_styles() -> None:
             .games-title {
                 color: var(--text);
                 font-weight: 700;
-                font-size: 0.95rem;
+                font-size: 1rem;
             }
 
             .games-date {
@@ -189,26 +206,76 @@ def inject_styles() -> None:
 
             .games-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-                gap: 0.5rem;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 0.65rem;
             }
 
             .game-tile {
-                border: 1px solid rgba(232,238,222,0.1);
-                border-radius: 7px;
-                background: #0b0d0a;
-                padding: 0.62rem 0.7rem;
+                border: 1px solid rgba(242,238,218,0.12);
+                border-radius: 9px;
+                background:
+                    linear-gradient(135deg, rgba(133,255,76,0.08), transparent 44%),
+                    #0b0d0a;
+                padding: 0.72rem;
+                overflow: hidden;
             }
 
             .game-matchup {
-                display: flex;
-                justify-content: space-between;
+                display: grid;
+                grid-template-columns: 1fr auto 1fr;
                 align-items: center;
                 gap: 0.6rem;
                 color: var(--text);
                 font-family: "Rajdhani", sans-serif;
-                font-size: 1.5rem;
+                font-size: 1.45rem;
                 line-height: 1;
+            }
+
+            .team-side {
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                min-width: 0;
+            }
+
+            .team-side.home-team {
+                justify-content: flex-end;
+                text-align: right;
+            }
+
+            .team-logo {
+                width: 42px;
+                height: 42px;
+                object-fit: contain;
+                flex: 0 0 auto;
+                filter: drop-shadow(0 5px 10px rgba(0,0,0,0.45));
+            }
+
+            .team-code {
+                color: var(--text);
+                white-space: nowrap;
+            }
+
+            .team-name {
+                color: var(--muted);
+                font-family: "IBM Plex Sans", sans-serif;
+                font-size: 0.68rem;
+                line-height: 1.05;
+                margin-top: 0.16rem;
+                max-width: 96px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .versus-mark {
+                color: var(--amber);
+                border: 1px solid rgba(255,191,56,0.28);
+                border-radius: 6px;
+                padding: 0.22rem 0.36rem;
+                font-size: 0.82rem;
+                font-family: "IBM Plex Sans", sans-serif;
+                font-weight: 700;
             }
 
             .game-meta {
@@ -217,7 +284,7 @@ def inject_styles() -> None:
                 gap: 0.8rem;
                 color: var(--muted);
                 font-size: 0.78rem;
-                margin-top: 0.4rem;
+                margin-top: 0.62rem;
             }
 
             .empty-strip {
@@ -239,7 +306,7 @@ def inject_styles() -> None:
             .board-title {
                 font-family: "Rajdhani", sans-serif;
                 color: var(--text);
-                font-size: 2rem;
+                font-size: 2.15rem;
                 line-height: 1;
                 text-transform: uppercase;
             }
@@ -258,7 +325,9 @@ def inject_styles() -> None:
             }
 
             .detail-panel {
-                background: var(--panel);
+                background:
+                    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)),
+                    var(--panel);
                 border: 1px solid var(--line);
                 border-radius: 8px;
                 padding: 0.95rem;
@@ -536,8 +605,8 @@ def render_app_header(status_items: list[str]) -> None:
         f"""
         <div class="app-header">
             <div>
-                <div class="app-title">NBA Prop Scanner</div>
-                <div class="app-subtitle">Top live player prop setups across points, boards, dimes, and combo markets.</div>
+                <div class="app-title">Prop Edge Board</div>
+                <div class="app-subtitle">Live NBA prop market board for points, rebounds, assists, and combo lines.</div>
             </div>
             <div class="status-strip">{chips}</div>
         </div>
@@ -556,6 +625,10 @@ def render_games_strip(games: pd.DataFrame, game_date_label: str, error: str = "
         for _, row in games.iterrows():
             away = html.escape(str(row.get("away_team", "")))
             home = html.escape(str(row.get("home_team", "")))
+            away_name = html.escape(str(row.get("away_team_name", "")))
+            home_name = html.escape(str(row.get("home_team_name", "")))
+            away_logo = html.escape(str(row.get("away_logo_url", "")))
+            home_logo = html.escape(str(row.get("home_logo_url", "")))
             time_text = html.escape(str(row.get("game_time", "")))
             series = html.escape(str(row.get("series_text", "")) or str(row.get("game_label", "")))
             score_text = ""
@@ -565,7 +638,23 @@ def render_games_strip(games: pd.DataFrame, game_date_label: str, error: str = "
             tiles.append(
                 f"""
                 <div class="game-tile">
-                    <div class="game-matchup"><span>{away}</span><span>@</span><span>{home}</span></div>
+                    <div class="game-matchup">
+                        <div class="team-side">
+                            <img class="team-logo" src="{away_logo}" alt="{away} logo">
+                            <div>
+                                <div class="team-code">{away}</div>
+                                <div class="team-name">{away_name}</div>
+                            </div>
+                        </div>
+                        <div class="versus-mark">@</div>
+                        <div class="team-side home-team">
+                            <div>
+                                <div class="team-code">{home}</div>
+                                <div class="team-name">{home_name}</div>
+                            </div>
+                            <img class="team-logo" src="{home_logo}" alt="{home} logo">
+                        </div>
+                    </div>
                     <div class="game-meta"><span>{time_text}</span><span>{meta_right}</span></div>
                 </div>
                 """
@@ -726,6 +815,20 @@ def fetch_live_props_cached(api_key: str, bookmakers: tuple[str, ...], days_ahea
         bookmakers=keys,
         days_ahead=days_ahead,
         prop_types=list(prop_types),
+    )
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def score_live_current_props_cached(
+    current_props: pd.DataFrame,
+    season: str,
+    historical_features: pd.DataFrame | None,
+) -> pd.DataFrame:
+    history_input = historical_features if historical_features is not None and not historical_features.empty else None
+    return score_live_current_props(
+        current_props,
+        season=season,
+        historical_features=history_input,
     )
 
 
@@ -999,6 +1102,8 @@ if "last_live_sync_display" not in st.session_state:
     st.session_state["last_live_sync_display"] = ""
 
 with st.sidebar:
+    active_view = st.radio("View", options=["Board", "History", "Player", "Method"], index=0)
+    st.markdown("---")
     st.markdown("## Feed")
     refresh_live = st.button("Run live scan now", width="stretch", type="primary")
     if st.session_state.get("last_live_sync_display"):
@@ -1069,9 +1174,15 @@ live_status_note = "Connect a saved API key to turn on the automatic live feed."
 history_sync_note = ""
 
 active_prop_filters = list(PROP_MARKET_MAP.keys())
-if api_key and fetch_prop_types and (auto_refresh_enabled or refresh_live):
+should_load_live = bool(
+    api_key
+    and fetch_prop_types
+    and (refresh_live or (auto_refresh_enabled and active_view in {"Board", "Player"}))
+)
+if should_load_live:
     if refresh_live:
         fetch_live_props_cached.clear()
+        score_live_current_props_cached.clear()
     try:
         live_raw = fetch_live_props_cached(api_key, tuple(bookmaker_keys), saved_days_ahead, tuple(fetch_prop_types))
         st.session_state["last_live_sync_display"] = pd.Timestamp.now(tz="America/Chicago").strftime("%b %d, %Y %I:%M %p %Z")
@@ -1082,13 +1193,15 @@ if api_key and fetch_prop_types and (auto_refresh_enabled or refresh_live):
             str(live_raw["market_last_update"].max()) if "market_last_update" in live_raw.columns and not live_raw.empty else "empty",
             len(live_raw),
         )
+        needs_final_score = True
         if sync_signature != st.session_state["last_history_sync_signature"]:
             baseline_history = history_features if history_is_real else pd.DataFrame()
-            live_scored = score_live_current_props(
+            live_scored = score_live_current_props_cached(
                 live_raw,
-                season=current_nba_season(),
-                historical_features=baseline_history if not baseline_history.empty else None,
+                current_nba_season(),
+                baseline_history if not baseline_history.empty else None,
             )
+            needs_final_score = False
             combined_props, combined_results, sync_info = sync_auto_history_from_live(
                 live_scored,
                 season=current_nba_season(),
@@ -1102,12 +1215,14 @@ if api_key and fetch_prop_types and (auto_refresh_enabled or refresh_live):
                 history_source_note = "Historical training cache is updating automatically from captured lines and finished NBA results."
                 if sync_info.get("resolved_rows", 0) > 0:
                     history_sync_note = f"Auto-added {sync_info['resolved_rows']} finished props into the training cache."
+                needs_final_score = True
 
-        live_scored = score_live_current_props(
-            live_raw,
-            season=current_nba_season(),
-            historical_features=history_features if history_is_real and not history_features.empty else None,
-        )
+        if needs_final_score:
+            live_scored = score_live_current_props_cached(
+                live_raw,
+                current_nba_season(),
+                history_features if history_is_real and not history_features.empty else None,
+            )
         live_scored = ensure_live_display_fields(live_scored)
         live_board = build_live_board(live_scored)
         live_status_note = (
@@ -1120,6 +1235,8 @@ if api_key and fetch_prop_types and (auto_refresh_enabled or refresh_live):
         live_status_note = "Live feed is connected, but the last automatic refresh did not complete."
 elif api_key and not auto_refresh_enabled:
     live_status_note = "Live feed is saved locally, but auto refresh is currently off."
+elif api_key:
+    live_status_note = "Live feed is connected. Open the Board view or press Run live scan now to refresh props."
 
 team_options = sorted(
     set(history_features["team"].dropna().unique().tolist()).union(live_board["team"].dropna().unique().tolist() if "team" in live_board.columns else [])
@@ -1173,9 +1290,7 @@ if st.session_state.get("last_live_sync_display"):
 render_app_header(status_parts)
 render_games_strip(today_games, today_local.strftime("%A, %b %d"), today_games_error)
 
-tab_scanner, tab_history, tab_player, tab_method = st.tabs(["Board", "History", "Player", "Method"])
-
-with tab_scanner:
+if active_view == "Board":
     if not api_key:
         render_notice(
             "Live scan is off",
@@ -1332,7 +1447,7 @@ with tab_scanner:
                 },
             )
 
-with tab_history:
+if active_view == "History":
     render_section_header(
         "Historical market view",
         "This page checks whether the selected prop markets have been running high, low, or fairly efficient in the historical sample. Focus on line error, hit-rate splits, and whether any segment actually holds later.",
@@ -1450,7 +1565,7 @@ with tab_history:
             },
         )
 
-with tab_player:
+if active_view == "Player":
     render_section_header(
         "Player view",
         "Use this page to understand one player and one prop market at a time: where the line has been set, how often it has been beaten, and how the live board is pricing that market across books.",
@@ -1575,7 +1690,7 @@ with tab_player:
             tone="gold",
         )
 
-with tab_method:
+if active_view == "Method":
     render_section_header(
         "How this works",
         "The app is designed to be easier to operate than to explain. This page keeps the logic plain: where the data comes from, what the score is, and where the limits still are.",
