@@ -13,10 +13,11 @@ from src.data_ingestion import load_demo_data
 from src.feature_engineering import build_historical_features
 from src.line_evaluation import collect_segment_tables, overall_market_metrics, rolling_edge_summary, temporal_stability_by_segment
 from src.live_data import (
-    current_nba_season,
-    fetch_daily_nba_games,
-    fetch_live_nba_player_points_props,
+    current_basketball_season,
+    fetch_daily_basketball_games,
+    fetch_live_basketball_player_props,
     load_cached_history,
+    normalize_sport,
     score_live_current_props,
     sync_auto_history_from_live,
 )
@@ -34,7 +35,7 @@ from src.visualization import (
 
 
 st.set_page_config(
-    page_title="NBA Prop Scanner",
+    page_title="Prop Edge Board",
     page_icon=":bar_chart:",
     layout="wide",
 )
@@ -59,6 +60,8 @@ BOOKMAKER_OPTIONS = {
     "fliff": "Fliff",
     "williamhill_us": "Caesars",
 }
+
+LEAGUE_OPTIONS = ["NBA", "WNBA"]
 
 
 def inject_styles() -> None:
@@ -599,14 +602,14 @@ def render_section_header(title: str, copy: str) -> None:
     )
 
 
-def render_app_header(status_items: list[str]) -> None:
+def render_app_header(status_items: list[str], league: str) -> None:
     chips = "".join(f'<span class="status-chip">{html.escape(item)}</span>' for item in status_items if item)
     st.markdown(
         f"""
         <div class="app-header">
             <div>
                 <div class="app-title">Prop Edge Board</div>
-                <div class="app-subtitle">Live NBA prop market board for points, rebounds, assists, and combo lines.</div>
+                <div class="app-subtitle">Live {html.escape(league)} prop market board for points, rebounds, assists, and combo lines.</div>
             </div>
             <div class="status-strip">{chips}</div>
         </div>
@@ -615,11 +618,11 @@ def render_app_header(status_items: list[str]) -> None:
     )
 
 
-def render_games_strip(games: pd.DataFrame, game_date_label: str, error: str = "") -> None:
+def render_games_strip(games: pd.DataFrame, game_date_label: str, league: str, error: str = "") -> None:
     if error:
         body = f'<div class="empty-strip">Today\'s games could not be loaded: {html.escape(error)}</div>'
     elif games.empty:
-        body = '<div class="empty-strip">No NBA games are scheduled for this date.</div>'
+        body = f'<div class="empty-strip">No {html.escape(league)} games are scheduled for this date.</div>'
     else:
         tiles = []
         for _, row in games.iterrows():
@@ -664,7 +667,7 @@ def render_games_strip(games: pd.DataFrame, game_date_label: str, error: str = "
         f"""
         <div class="games-band">
             <div class="games-head">
-                <div class="games-title">Today's NBA games</div>
+                <div class="games-title">Today's {html.escape(league)} games</div>
                 <div class="games-date">{html.escape(game_date_label)}</div>
             </div>
             {body}
@@ -723,8 +726,8 @@ def render_selected_prop_card(row: pd.Series) -> None:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_daily_games_cached(game_date: str) -> pd.DataFrame:
-    return fetch_daily_nba_games(game_date=game_date, timezone_name="America/Chicago")
+def fetch_daily_games_cached(game_date: str, league: str) -> pd.DataFrame:
+    return fetch_daily_basketball_games(game_date=game_date, timezone_name="America/Chicago", sport=league)
 
 
 def lean_text_style(value: Any) -> str:
@@ -807,14 +810,25 @@ def build_empty_history_pipeline() -> dict[str, pd.DataFrame]:
     return build_history_pipeline(empty_props, empty_results)
 
 
+def filter_history_for_league(history_features: pd.DataFrame, league: str) -> pd.DataFrame:
+    selected_league = normalize_sport(league)
+    if history_features.empty:
+        return history_features.copy()
+    if "sport" not in history_features.columns:
+        return history_features.copy() if selected_league == "NBA" else history_features.iloc[0:0].copy()
+    league_mask = history_features["sport"].fillna("NBA").astype(str).str.upper() == selected_league
+    return history_features.loc[league_mask].reset_index(drop=True)
+
+
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_live_props_cached(api_key: str, bookmakers: tuple[str, ...], days_ahead: int, prop_types: tuple[str, ...]) -> pd.DataFrame:
+def fetch_live_props_cached(api_key: str, bookmakers: tuple[str, ...], days_ahead: int, prop_types: tuple[str, ...], league: str) -> pd.DataFrame:
     keys = list(bookmakers) if bookmakers else None
-    return fetch_live_nba_player_points_props(
+    return fetch_live_basketball_player_props(
         api_key=api_key,
         bookmakers=keys,
         days_ahead=days_ahead,
         prop_types=list(prop_types),
+        sport=league,
     )
 
 
@@ -823,12 +837,14 @@ def score_live_current_props_cached(
     current_props: pd.DataFrame,
     season: str,
     historical_features: pd.DataFrame | None,
+    league: str,
 ) -> pd.DataFrame:
     history_input = historical_features if historical_features is not None and not historical_features.empty else None
     return score_live_current_props(
         current_props,
         season=season,
         historical_features=history_input,
+        sport=league,
     )
 
 
@@ -1093,6 +1109,7 @@ saved_api_key = str(saved_settings.get("api_key") or os.getenv("THE_ODDS_API_KEY
 saved_bookmakers = [key for key in saved_settings.get("bookmakers", []) if key in BOOKMAKER_OPTIONS] or list(BOOKMAKER_OPTIONS.keys())[:5]
 saved_fetch_prop_types = [prop for prop in saved_settings.get("prop_types", []) if prop in PROP_MARKET_MAP] or list(PROP_MARKET_MAP.keys())
 saved_days_ahead = int(saved_settings.get("days_ahead", 1))
+saved_league = normalize_sport(saved_settings.get("league", "NBA"))
 auto_refresh_enabled = bool(saved_settings.get("auto_refresh", True))
 auto_refresh_minutes = int(saved_settings.get("auto_refresh_minutes", 20))
 
@@ -1103,6 +1120,13 @@ if "last_live_sync_display" not in st.session_state:
 
 with st.sidebar:
     active_view = st.radio("View", options=["Board", "History", "Player", "Method"], index=0)
+    league_choice = st.radio(
+        "League",
+        options=LEAGUE_OPTIONS,
+        index=LEAGUE_OPTIONS.index(saved_league),
+        horizontal=True,
+    )
+    selected_league = normalize_sport(league_choice)
     st.markdown("---")
     st.markdown("## Feed")
     refresh_live = st.button("Run live scan now", width="stretch", type="primary")
@@ -1144,6 +1168,7 @@ if save_settings_clicked:
             "bookmakers": bookmaker_input,
             "prop_types": fetch_prop_input or list(PROP_MARKET_MAP.keys()),
             "days_ahead": days_ahead_input,
+            "league": selected_league,
             "auto_refresh": auto_refresh_input,
             "auto_refresh_minutes": auto_refresh_minutes,
         }
@@ -1164,7 +1189,7 @@ history_source_note = (
 )
 history_is_real = has_saved_history
 history_pipeline = build_history_pipeline(cached_history_props, cached_game_results) if has_saved_history else build_empty_history_pipeline()
-history_features = history_pipeline["historical_features"]
+history_features = filter_history_for_league(history_pipeline["historical_features"], selected_league)
 
 live_raw = pd.DataFrame()
 live_scored = pd.DataFrame()
@@ -1184,9 +1209,10 @@ if should_load_live:
         fetch_live_props_cached.clear()
         score_live_current_props_cached.clear()
     try:
-        live_raw = fetch_live_props_cached(api_key, tuple(bookmaker_keys), saved_days_ahead, tuple(fetch_prop_types))
+        live_raw = fetch_live_props_cached(api_key, tuple(bookmaker_keys), saved_days_ahead, tuple(fetch_prop_types), selected_league)
         st.session_state["last_live_sync_display"] = pd.Timestamp.now(tz="America/Chicago").strftime("%b %d, %Y %I:%M %p %Z")
         sync_signature = (
+            selected_league,
             tuple(sorted(fetch_prop_types)),
             tuple(sorted(bookmaker_keys)),
             saved_days_ahead,
@@ -1198,21 +1224,23 @@ if should_load_live:
             baseline_history = history_features if history_is_real else pd.DataFrame()
             live_scored = score_live_current_props_cached(
                 live_raw,
-                current_nba_season(),
+                current_basketball_season(selected_league),
                 baseline_history if not baseline_history.empty else None,
+                selected_league,
             )
             needs_final_score = False
             combined_props, combined_results, sync_info = sync_auto_history_from_live(
                 live_scored,
-                season=current_nba_season(),
+                season=current_basketball_season(selected_league),
+                sport=selected_league,
             )
             st.session_state["last_history_sync_signature"] = sync_signature
             if combined_props is not None and combined_results is not None and not combined_props.empty:
                 history_pipeline = build_history_pipeline(combined_props, combined_results)
-                history_features = history_pipeline["historical_features"]
+                history_features = filter_history_for_league(history_pipeline["historical_features"], selected_league)
                 history_is_real = True
                 history_source_label = "Auto history cache"
-                history_source_note = "Historical training cache is updating automatically from captured lines and finished NBA results."
+                history_source_note = f"Historical training cache is updating automatically from captured lines and finished {selected_league} results."
                 if sync_info.get("resolved_rows", 0) > 0:
                     history_sync_note = f"Auto-added {sync_info['resolved_rows']} finished props into the training cache."
                 needs_final_score = True
@@ -1220,8 +1248,9 @@ if should_load_live:
         if needs_final_score:
             live_scored = score_live_current_props_cached(
                 live_raw,
-                current_nba_season(),
+                current_basketball_season(selected_league),
                 history_features if history_is_real and not history_features.empty else None,
+                selected_league,
             )
         live_scored = ensure_live_display_fields(live_scored)
         live_board = build_live_board(live_scored)
@@ -1273,11 +1302,12 @@ today_local = pd.Timestamp.now(tz="America/Chicago")
 today_games = pd.DataFrame()
 today_games_error = ""
 try:
-    today_games = fetch_daily_games_cached(today_local.date().isoformat())
+    today_games = fetch_daily_games_cached(today_local.date().isoformat(), selected_league)
 except Exception as exc:
     today_games_error = str(exc)
 
 status_parts = [
+    selected_league,
     f"{history_source_label}",
     f"{live_book_count} books",
     f"{live_prop_count} live lines",
@@ -1287,8 +1317,8 @@ status_parts = [
 ]
 if st.session_state.get("last_live_sync_display"):
     status_parts.append(f"Last sync {st.session_state['last_live_sync_display']}")
-render_app_header(status_parts)
-render_games_strip(today_games, today_local.strftime("%A, %b %d"), today_games_error)
+render_app_header(status_parts, selected_league)
+render_games_strip(today_games, today_local.strftime("%A, %b %d"), selected_league, today_games_error)
 
 if active_view == "Board":
     if not api_key:
@@ -1313,7 +1343,7 @@ if active_view == "Board":
         if not history_is_real:
             render_notice(
                 "Historical cache is still warming up",
-                "The live board is active. Historical validation will get stronger as captured lines resolve into finished NBA results.",
+                f"The live board is active. Historical validation will get stronger as captured lines resolve into finished {selected_league} results.",
                 tone="gold",
             )
 
@@ -1477,7 +1507,7 @@ if active_view == "History":
                 {
                     "label": "Props tracked",
                     "value": f"{int(metrics['total_props'])}",
-                    "note": "Historical NBA player props in the active filter set.",
+                    "note": f"Historical {selected_league} player props in the active filter set.",
                     "tone": "cyan",
                 },
                 {
@@ -1702,7 +1732,7 @@ if active_view == "Method":
             <div class="method-card">
                 <div class="method-step">Step 1</div>
                 <div class="method-label">Pull live books</div>
-                <div class="method-copy">The scanner calls a live sportsbook API for NBA player prop markets, including points, rebounds, assists, and common combos, then builds a book-by-book board for the next few days.</div>
+                <div class="method-copy">The scanner calls a live sportsbook API for NBA and WNBA player prop markets, including points, rebounds, assists, and common combos, then builds a book-by-book board for the next few days.</div>
             </div>
             <div class="method-card">
                 <div class="method-step">Step 2</div>
@@ -1730,7 +1760,7 @@ if active_view == "Method":
             {
                 "label": "Historical layer",
                 "value": "Auto cache",
-                "note": "Captured live lines are archived locally and matched to finished NBA results to grow the training set over time.",
+                "note": "Captured live lines are archived locally and matched to finished NBA or WNBA results to grow the training set over time.",
                 "tone": "cyan",
             },
             {
@@ -1741,8 +1771,8 @@ if active_view == "Method":
             },
             {
                 "label": "Scope",
-                "value": "NBA Props",
-                "note": "Version 1 is intentionally narrow so the workflow is clearer and easier to trust.",
+                "value": "NBA + WNBA",
+                "note": "The live board supports basketball prop markets while keeping each league filtered separately.",
                 "tone": "pink",
             },
         ]
@@ -1785,7 +1815,7 @@ if active_view == "Method":
         """
         **Version 1 limitations**
 
-        - Only NBA player props are supported, focused on points, rebounds, assists, and common combo markets.
+        - NBA and WNBA player props are supported, focused on points, rebounds, assists, and common combo markets.
         - The scanner ranks setups; it does not output true bet probabilities or expected value after vig.
         - Historical conclusions are only as good as the local prop-line history the app has captured or imported.
         - Injury news, teammate absences, and pace/game-total context are not fully modeled yet.

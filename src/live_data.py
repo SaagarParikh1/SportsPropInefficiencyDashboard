@@ -22,6 +22,23 @@ THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 CACHED_HISTORY_PROPS = CACHE_DIR / "historical_props_latest.parquet"
 CACHED_HISTORY_RESULTS = CACHE_DIR / "game_results_latest.parquet"
 PENDING_PROP_ARCHIVE = CACHE_DIR / "pending_live_props.parquet"
+SPORT_CONFIG = {
+    "NBA": {
+        "sport_key": "basketball_nba",
+        "league_id": "00",
+        "label": "NBA",
+    },
+    "WNBA": {
+        "sport_key": "basketball_wnba",
+        "league_id": "10",
+        "label": "WNBA",
+    },
+}
+
+
+def normalize_sport(value: str | None) -> str:
+    sport = str(value or "NBA").strip().upper()
+    return sport if sport in SPORT_CONFIG else "NBA"
 
 
 def current_nba_season(reference_date: datetime | None = None) -> str:
@@ -32,6 +49,14 @@ def current_nba_season(reference_date: datetime | None = None) -> str:
         start_year = now.year - 1
     end_year = (start_year + 1) % 100
     return f"{start_year}-{end_year:02d}"
+
+
+def current_basketball_season(sport: str = "NBA", reference_date: datetime | None = None) -> str:
+    selected_sport = normalize_sport(sport)
+    if selected_sport == "WNBA":
+        now = reference_date or datetime.now(timezone.utc)
+        return str(now.year)
+    return current_nba_season(reference_date)
 
 
 def _normalize_calendar_date(values: Any) -> Any:
@@ -54,7 +79,13 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def fetch_daily_nba_games(game_date: str | datetime | pd.Timestamp | None = None, timezone_name: str = "America/Chicago") -> pd.DataFrame:
+def fetch_daily_basketball_games(
+    game_date: str | datetime | pd.Timestamp | None = None,
+    timezone_name: str = "America/Chicago",
+    sport: str = "NBA",
+) -> pd.DataFrame:
+    selected_sport = normalize_sport(sport)
+    league_id = SPORT_CONFIG[selected_sport]["league_id"]
     reference_date = (
         pd.Timestamp.now(tz=timezone_name).date()
         if game_date is None
@@ -84,7 +115,7 @@ def fetch_daily_nba_games(game_date: str | datetime | pd.Timestamp | None = None
     if pd.isna(reference_date):
         return empty
 
-    board = scoreboardv3.ScoreboardV3(game_date=reference_date.isoformat(), timeout=20)
+    board = scoreboardv3.ScoreboardV3(game_date=reference_date.isoformat(), league_id=league_id, timeout=20)
     frames = board.get_data_frames()
     if len(frames) < 3:
         return empty
@@ -145,9 +176,16 @@ def fetch_daily_nba_games(game_date: str | datetime | pd.Timestamp | None = None
     return pd.DataFrame(rows)
 
 
+def fetch_daily_nba_games(game_date: str | datetime | pd.Timestamp | None = None, timezone_name: str = "America/Chicago") -> pd.DataFrame:
+    return fetch_daily_basketball_games(game_date=game_date, timezone_name=timezone_name, sport="NBA")
+
+
 def _team_name_map() -> dict[str, str]:
     mapping: dict[str, str] = {}
-    for team in teams.get_teams():
+    all_teams = teams.get_teams()
+    if hasattr(teams, "get_wnba_teams"):
+        all_teams = all_teams + teams.get_wnba_teams()
+    for team in all_teams:
         full_name = team["full_name"]
         abbreviation = team["abbreviation"]
         mapping[full_name.lower()] = abbreviation
@@ -209,11 +247,13 @@ def _requests_get(url: str, params: dict[str, Any], max_attempts: int = 3) -> An
     return response.json()
 
 
-def fetch_upcoming_nba_events(
+def fetch_upcoming_basketball_events(
     api_key: str,
     days_ahead: int = 2,
+    sport: str = "NBA",
 ) -> list[dict[str, Any]]:
-    url = f"{THE_ODDS_API_BASE}/sports/basketball_nba/events"
+    sport_key = SPORT_CONFIG[normalize_sport(sport)]["sport_key"]
+    url = f"{THE_ODDS_API_BASE}/sports/{sport_key}/events"
     events = _requests_get(url, {"apiKey": api_key, "dateFormat": "iso"})
     cutoff = datetime.now(timezone.utc) + timedelta(days=max(1, days_ahead))
     filtered_events: list[dict[str, Any]] = []
@@ -226,14 +266,23 @@ def fetch_upcoming_nba_events(
     return filtered_events
 
 
+def fetch_upcoming_nba_events(
+    api_key: str,
+    days_ahead: int = 2,
+) -> list[dict[str, Any]]:
+    return fetch_upcoming_basketball_events(api_key=api_key, days_ahead=days_ahead, sport="NBA")
+
+
 def fetch_event_player_props(
     api_key: str,
     event_id: str,
     markets: list[str],
     bookmakers: list[str] | None = None,
     regions: str = "us,us2",
+    sport: str = "NBA",
 ) -> dict[str, Any]:
-    url = f"{THE_ODDS_API_BASE}/sports/basketball_nba/events/{event_id}/odds"
+    sport_key = SPORT_CONFIG[normalize_sport(sport)]["sport_key"]
+    url = f"{THE_ODDS_API_BASE}/sports/{sport_key}/events/{event_id}/odds"
     params = {
         "apiKey": api_key,
         "regions": regions,
@@ -252,6 +301,8 @@ def _flatten_outcomes_to_rows(event_payload: dict[str, Any]) -> list[dict[str, A
     commence_time = event_payload.get("commence_time")
     home_team_name = event_payload.get("home_team")
     away_team_name = event_payload.get("away_team")
+    sport_key = event_payload.get("sport_key")
+    sport = "WNBA" if sport_key == SPORT_CONFIG["WNBA"]["sport_key"] else "NBA"
 
     for bookmaker in event_payload.get("bookmakers", []):
         bookmaker_key = bookmaker.get("key")
@@ -273,6 +324,8 @@ def _flatten_outcomes_to_rows(event_payload: dict[str, Any]) -> list[dict[str, A
                     key,
                     {
                         "event_id": event_id,
+                        "sport": sport,
+                        "sport_key": sport_key,
                         "game_date": commence_time,
                         "player_name": str(player_name),
                         "prop_type": prop_type,
@@ -290,14 +343,16 @@ def _flatten_outcomes_to_rows(event_payload: dict[str, Any]) -> list[dict[str, A
     return rows
 
 
-def fetch_live_nba_player_points_props(
+def fetch_live_basketball_player_props(
     api_key: str,
     bookmakers: list[str] | None = None,
     days_ahead: int = 2,
     regions: str = "us,us2",
     prop_types: list[str] | None = None,
+    sport: str = "NBA",
 ) -> pd.DataFrame:
-    events = fetch_upcoming_nba_events(api_key=api_key, days_ahead=days_ahead)
+    selected_sport = normalize_sport(sport)
+    events = fetch_upcoming_basketball_events(api_key=api_key, days_ahead=days_ahead, sport=selected_sport)
     markets = supported_market_keys(prop_types)
     rows: list[dict[str, Any]] = []
     for index, event in enumerate(events):
@@ -309,6 +364,7 @@ def fetch_live_nba_player_points_props(
             markets=markets,
             bookmakers=bookmakers,
             regions=regions,
+            sport=selected_sport,
         )
         rows.extend(_flatten_outcomes_to_rows(payload))
 
@@ -316,6 +372,8 @@ def fetch_live_nba_player_points_props(
         return pd.DataFrame(
             columns=[
                 "event_id",
+                "sport",
+                "sport_key",
                 "game_date",
                 "player_name",
                 "prop_type",
@@ -333,9 +391,34 @@ def fetch_live_nba_player_points_props(
     ).reset_index(drop=True)
 
 
-@lru_cache(maxsize=4)
-def _fetch_season_player_logs_cached(season_value: str) -> pd.DataFrame:
-    logs = playergamelogs.PlayerGameLogs(season_nullable=season_value).get_data_frames()[0].copy()
+def fetch_live_nba_player_points_props(
+    api_key: str,
+    bookmakers: list[str] | None = None,
+    days_ahead: int = 2,
+    regions: str = "us,us2",
+    prop_types: list[str] | None = None,
+    sport: str = "NBA",
+) -> pd.DataFrame:
+    """Backward-compatible wrapper for older app imports."""
+    return fetch_live_basketball_player_props(
+        api_key=api_key,
+        bookmakers=bookmakers,
+        days_ahead=days_ahead,
+        regions=regions,
+        prop_types=prop_types,
+        sport=sport,
+    )
+
+
+@lru_cache(maxsize=8)
+def _fetch_season_player_logs_cached(season_value: str, sport: str) -> pd.DataFrame:
+    selected_sport = normalize_sport(sport)
+    league_id = SPORT_CONFIG[selected_sport]["league_id"]
+    logs = playergamelogs.PlayerGameLogs(
+        season_nullable=season_value,
+        league_id_nullable=league_id,
+        timeout=30,
+    ).get_data_frames()[0].copy()
     logs["GAME_DATE"] = pd.to_datetime(logs["GAME_DATE"], errors="coerce")
     for stat_column in ["PTS", "REB", "AST", "MIN"]:
         if stat_column in logs.columns:
@@ -346,9 +429,10 @@ def _fetch_season_player_logs_cached(season_value: str) -> pd.DataFrame:
     return logs.sort_values(["PLAYER_NAME", "GAME_DATE"]).reset_index(drop=True)
 
 
-def fetch_season_player_logs(season: str | None = None) -> pd.DataFrame:
-    season_value = season or current_nba_season()
-    return _fetch_season_player_logs_cached(season_value).copy()
+def fetch_season_player_logs(season: str | None = None, sport: str = "NBA") -> pd.DataFrame:
+    selected_sport = normalize_sport(sport)
+    season_value = season or current_basketball_season(selected_sport)
+    return _fetch_season_player_logs_cached(season_value, selected_sport).copy()
 
 
 def _expand_logs_by_prop_type(player_logs: pd.DataFrame) -> pd.DataFrame:
@@ -368,7 +452,7 @@ def _expand_logs_by_prop_type(player_logs: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(prop_frames, ignore_index=True).sort_values(["PLAYER_NAME", "prop_type", "GAME_DATE"]).reset_index(drop=True)
 
 
-def build_auto_game_results_from_logs(player_logs: pd.DataFrame) -> pd.DataFrame:
+def build_auto_game_results_from_logs(player_logs: pd.DataFrame, sport: str = "NBA") -> pd.DataFrame:
     if player_logs.empty:
         return pd.DataFrame(
             columns=[
@@ -410,7 +494,7 @@ def build_auto_game_results_from_logs(player_logs: pd.DataFrame) -> pd.DataFrame
             "MIN": "minutes_played",
         }
     )
-    expanded["sport"] = APP_CONFIG.default_sport
+    expanded["sport"] = normalize_sport(sport)
     expanded["usage_rate"] = np.nan
     expanded["game_date"] = _normalize_calendar_date(expanded["game_date"])
     expanded["game_id"] = expanded.apply(
@@ -502,6 +586,7 @@ def enrich_live_current_props(
     current_props: pd.DataFrame,
     player_snapshot: pd.DataFrame,
     opponent_snapshot: pd.DataFrame,
+    sport: str = "NBA",
 ) -> pd.DataFrame:
     if current_props.empty:
         return current_props.copy()
@@ -509,14 +594,40 @@ def enrich_live_current_props(
     data = current_props.copy()
     data["home_team"] = data["home_team_name"].astype(str).str.lower().map(TEAM_NAME_TO_ABBR)
     data["away_team"] = data["away_team_name"].astype(str).str.lower().map(TEAM_NAME_TO_ABBR)
-    enriched = data.merge(player_snapshot, on=["player_name", "prop_type"], how="left")
+    if player_snapshot.empty:
+        enriched = data.copy()
+    else:
+        enriched = data.merge(player_snapshot, on=["player_name", "prop_type"], how="left")
+    if "team" not in enriched.columns:
+        enriched["team"] = ""
     enriched["team"] = enriched["team"].fillna("")
     enriched["is_home"] = enriched["team"] == enriched["home_team"]
     enriched["opponent"] = np.where(enriched["is_home"], enriched["away_team"], enriched["home_team"])
     enriched["game_date"] = _normalize_calendar_date(enriched["game_date"])
-    enriched["sport"] = APP_CONFIG.default_sport
+    enriched["sport"] = normalize_sport(sport)
     enriched["market_type"] = APP_CONFIG.default_market_type
-    enriched = enriched.merge(opponent_snapshot, on=["prop_type", "opponent"], how="left")
+    if not opponent_snapshot.empty:
+        enriched = enriched.merge(opponent_snapshot, on=["prop_type", "opponent"], how="left")
+    for column, default in {
+        "rolling_avg_5": np.nan,
+        "rolling_avg_10": np.nan,
+        "rolling_median_10": np.nan,
+        "season_avg_prior": np.nan,
+        "recent_std_10": np.nan,
+        "recent_variance_10": np.nan,
+        "consistency_score": 50.0,
+        "trend_direction": 0.0,
+        "games_in_sample": 0,
+        "opponent_sample": 0,
+        "matchup_allowance_delta": 0.0,
+        "matchup_difficulty_score": 50.0,
+    }.items():
+        if column not in enriched.columns:
+            enriched[column] = default
+    enriched["rolling_avg_10"] = enriched["rolling_avg_10"].fillna(enriched["line"])
+    enriched["rolling_avg_5"] = enriched["rolling_avg_5"].fillna(enriched["rolling_avg_10"])
+    enriched["rolling_median_10"] = enriched["rolling_median_10"].fillna(enriched["rolling_avg_10"])
+    enriched["season_avg_prior"] = enriched["season_avg_prior"].fillna(enriched["rolling_avg_10"])
     enriched["line_minus_recent_avg"] = enriched["line"] - enriched["rolling_avg_10"]
     enriched["line_minus_season_avg"] = enriched["line"] - enriched["season_avg_prior"]
     enriched["line_minus_recent_median"] = enriched["line"] - enriched["rolling_median_10"]
@@ -531,13 +642,15 @@ def score_live_current_props(
     current_props: pd.DataFrame,
     season: str | None = None,
     historical_features: pd.DataFrame | None = None,
+    sport: str = "NBA",
 ) -> pd.DataFrame:
     if current_props.empty:
         return current_props.copy()
 
-    logs = fetch_season_player_logs(season=season)
+    selected_sport = normalize_sport(sport)
+    logs = fetch_season_player_logs(season=season, sport=selected_sport)
     player_snapshot, opponent_snapshot = build_live_player_feature_snapshot(logs)
-    enriched = enrich_live_current_props(current_props, player_snapshot, opponent_snapshot)
+    enriched = enrich_live_current_props(current_props, player_snapshot, opponent_snapshot, sport=selected_sport)
     if historical_features is not None and not historical_features.empty:
         enriched = attach_reference_tables(enriched, historical_features)
     scored = score_current_props(enriched)
@@ -585,12 +698,17 @@ def build_pending_prop_archive_rows(live_scored: pd.DataFrame) -> pd.DataFrame:
     if not required_columns.issubset(live_scored.columns):
         return pd.DataFrame()
 
+    live_scored = live_scored.copy()
+    if "sport" not in live_scored.columns:
+        live_scored["sport"] = APP_CONFIG.default_sport
+
     archive = (
         live_scored.groupby(
             ["event_id", "player_name", "team", "opponent", "is_home", "prop_type"],
             dropna=False,
         )
         .agg(
+            sport=("sport", "first"),
             game_date=("game_date", "first"),
             closing_line=("line", "median"),
             opening_line=("line", "first"),
@@ -603,7 +721,7 @@ def build_pending_prop_archive_rows(live_scored: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     archive["game_date"] = _normalize_calendar_date(archive["game_date"])
-    archive["sport"] = APP_CONFIG.default_sport
+    archive["sport"] = archive["sport"].fillna(APP_CONFIG.default_sport)
     archive["market_type"] = APP_CONFIG.default_market_type
     archive["bookmaker"] = "auto_consensus"
     archive["captured_at"] = pd.Timestamp.utcnow()
@@ -613,6 +731,7 @@ def build_pending_prop_archive_rows(live_scored: pd.DataFrame) -> pd.DataFrame:
 def sync_auto_history_from_live(
     live_scored: pd.DataFrame,
     season: str | None = None,
+    sport: str = "NBA",
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None, dict[str, int]]:
     if live_scored.empty:
         return None, None, {"resolved_rows": 0, "pending_rows": 0}
@@ -620,10 +739,14 @@ def sync_auto_history_from_live(
     pending_existing = _load_pending_prop_archive()
     if not pending_existing.empty and "game_date" in pending_existing.columns:
         pending_existing["game_date"] = _normalize_calendar_date(pending_existing["game_date"])
+    if not pending_existing.empty:
+        if "sport" not in pending_existing.columns:
+            pending_existing["sport"] = APP_CONFIG.default_sport
+        pending_existing["sport"] = pending_existing["sport"].fillna(APP_CONFIG.default_sport)
     pending_new = build_pending_prop_archive_rows(live_scored)
     if pending_new.empty:
         return None, None, {"resolved_rows": 0, "pending_rows": 0}
-    pending_keys = ["event_id", "player_name", "prop_type"]
+    pending_keys = ["event_id", "player_name", "prop_type", "sport"]
     pending_archive = (
         pd.concat([pending_existing, pending_new], ignore_index=True)
         .sort_values("captured_at")
@@ -631,8 +754,9 @@ def sync_auto_history_from_live(
         .reset_index(drop=True)
     )
 
-    player_logs = fetch_season_player_logs(season=season)
-    auto_results = build_auto_game_results_from_logs(player_logs)
+    selected_sport = normalize_sport(sport)
+    player_logs = fetch_season_player_logs(season=season, sport=selected_sport)
+    auto_results = build_auto_game_results_from_logs(player_logs, sport=selected_sport)
     if auto_results.empty:
         _save_pending_prop_archive(pending_archive)
         return None, None, {"resolved_rows": 0, "pending_rows": len(pending_archive)}
@@ -642,7 +766,7 @@ def sync_auto_history_from_live(
 
     candidates = pending_archive.merge(
         auto_results,
-        on=["player_name", "team", "opponent", "is_home", "prop_type"],
+        on=["sport", "player_name", "team", "opponent", "is_home", "prop_type"],
         how="left",
         suffixes=("_pending", "_result"),
     )
