@@ -86,6 +86,7 @@ def fetch_daily_basketball_games(
 ) -> pd.DataFrame:
     selected_sport = normalize_sport(sport)
     league_id = SPORT_CONFIG[selected_sport]["league_id"]
+    logo_league_path = selected_sport.lower()
     reference_date = (
         pd.Timestamp.now(tz=timezone_name).date()
         if game_date is None
@@ -162,8 +163,8 @@ def fetch_daily_basketball_games(
                 "home_team_id": str(home.get("teamId", "")),
                 "away_team_name": f"{away.get('teamCity', '')} {away.get('teamName', '')}".strip(),
                 "home_team_name": f"{home.get('teamCity', '')} {home.get('teamName', '')}".strip(),
-                "away_logo_url": f"https://cdn.nba.com/logos/nba/{away.get('teamId', '')}/primary/L/logo.svg",
-                "home_logo_url": f"https://cdn.nba.com/logos/nba/{home.get('teamId', '')}/primary/L/logo.svg",
+                "away_logo_url": f"https://cdn.nba.com/logos/{logo_league_path}/{away.get('teamId', '')}/primary/L/logo.svg",
+                "home_logo_url": f"https://cdn.nba.com/logos/{logo_league_path}/{home.get('teamId', '')}/primary/L/logo.svg",
                 "away_score": _safe_int(away.get("score", 0)),
                 "home_score": _safe_int(home.get("score", 0)),
                 "away_record": f"{_safe_int(away.get('wins', 0))}-{_safe_int(away.get('losses', 0))}",

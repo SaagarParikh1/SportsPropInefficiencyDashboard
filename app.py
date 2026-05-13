@@ -64,16 +64,49 @@ BOOKMAKER_OPTIONS = {
 LEAGUE_OPTIONS = ["NBA", "WNBA"]
 
 
-def inject_styles() -> None:
-    st.markdown(
-        """
+def inject_styles(league: str = "NBA") -> None:
+    selected_league = normalize_sport(league)
+    theme = {
+        "NBA": {
+            "bg": "#080a07",
+            "panel": "#10130f",
+            "panel_2": "#171b14",
+            "sidebar": "#090d0a",
+            "accent": "#85ff4c",
+            "accent_2": "#3ff5d5",
+            "accent_3": "#ffbf38",
+            "app_wash": "rgba(133,255,76,0.08)",
+            "accent_wash": "rgba(133,255,76,0.12)",
+            "sidebar_wash": "rgba(63,245,213,0.08)",
+        },
+        "WNBA": {
+            "bg": "#090815",
+            "panel": "#111020",
+            "panel_2": "#18142b",
+            "sidebar": "#0c0a18",
+            "accent": "#ff4fb8",
+            "accent_2": "#38e8ff",
+            "accent_3": "#ff9f1c",
+            "app_wash": "rgba(255,79,184,0.10)",
+            "accent_wash": "rgba(255,79,184,0.14)",
+            "sidebar_wash": "rgba(56,232,255,0.08)",
+        },
+    }[selected_league]
+    css = """
         <style>
             @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap');
 
             :root {
-                --bg: #080807;
-                --panel: #11130f;
-                --panel-2: #181b14;
+                --bg: __BG__;
+                --panel: __PANEL__;
+                --panel-2: __PANEL_2__;
+                --sidebar-bg: __SIDEBAR__;
+                --accent: __ACCENT__;
+                --accent-2: __ACCENT_2__;
+                --accent-3: __ACCENT_3__;
+                --app-wash: __APP_WASH__;
+                --accent-wash: __ACCENT_WASH__;
+                --sidebar-wash: __SIDEBAR_WASH__;
                 --line: rgba(242, 238, 218, 0.12);
                 --text: #f7f2df;
                 --muted: #a8a38f;
@@ -88,7 +121,7 @@ def inject_styles() -> None:
 
             .stApp {
                 background:
-                    linear-gradient(180deg, rgba(255,191,56,0.07), rgba(8,8,7,0) 260px),
+                    linear-gradient(180deg, var(--app-wash), rgba(8,8,7,0) 300px),
                     repeating-linear-gradient(90deg, rgba(255,255,255,0.018) 0, rgba(255,255,255,0.018) 1px, transparent 1px, transparent 62px),
                     var(--bg);
                 color: var(--text);
@@ -107,19 +140,127 @@ def inject_styles() -> None:
 
             .block-container {
                 max-width: 1440px;
-                padding-top: 4rem;
+                padding-top: 3.2rem;
                 padding-bottom: 2.4rem;
             }
 
             section[data-testid="stSidebar"] {
-                background: #0c0e0b;
+                background:
+                    radial-gradient(circle at top left, var(--sidebar-wash), transparent 38%),
+                    linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.006)),
+                    var(--sidebar-bg);
                 border-right: 1px solid var(--line);
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+                padding-top: 1.35rem;
             }
 
             section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
             section[data-testid="stSidebar"] label,
             section[data-testid="stSidebar"] span {
                 color: rgba(243,245,237,0.78);
+            }
+
+            section[data-testid="stSidebar"] h2,
+            section[data-testid="stSidebar"] h3 {
+                color: var(--text);
+                font-family: "Rajdhani", sans-serif;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p {
+                font-size: 0.76rem;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: rgba(247,242,223,0.64);
+            }
+
+            section[data-testid="stSidebar"] div[role="radiogroup"] {
+                gap: 0.25rem;
+            }
+
+            .sidebar-brand {
+                border-bottom: 1px solid var(--line);
+                color: var(--text);
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1.35rem;
+                line-height: 1;
+                margin-bottom: 0.85rem;
+                padding-bottom: 0.75rem;
+                text-transform: uppercase;
+            }
+
+            .sidebar-brand span {
+                color: var(--accent);
+            }
+
+            .side-section-label {
+                color: var(--accent-2);
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1rem;
+                letter-spacing: 0.04em;
+                margin: 1rem 0 0.35rem 0;
+                text-transform: uppercase;
+            }
+
+            .league-switch-shell {
+                align-items: center;
+                background:
+                    linear-gradient(135deg, var(--accent-wash), transparent 42%),
+                    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012)),
+                    var(--panel);
+                border: 1px solid var(--line);
+                border-radius: 16px;
+                display: flex;
+                justify-content: space-between;
+                gap: 1rem;
+                margin: 0 0 0.45rem 0;
+                padding: 0.72rem 0.88rem;
+            }
+
+            .league-switch-title {
+                color: var(--text);
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1.38rem;
+                line-height: 1;
+                text-transform: uppercase;
+            }
+
+            .league-switch-copy {
+                color: var(--muted);
+                font-size: 0.82rem;
+                margin-top: 0.15rem;
+            }
+
+            .league-active-pill {
+                border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+                border-radius: 999px;
+                color: var(--accent);
+                font-family: "Rajdhani", sans-serif;
+                font-size: 1rem;
+                padding: 0.35rem 0.72rem;
+                text-transform: uppercase;
+                white-space: nowrap;
+            }
+
+            div[data-testid="stSegmentedControl"] {
+                margin-bottom: 1rem;
+            }
+
+            div[data-testid="stSegmentedControl"] button {
+                border-radius: 999px !important;
+                font-family: "Rajdhani", sans-serif !important;
+                font-size: 1.05rem !important;
+                min-width: 92px;
+                text-transform: uppercase;
+            }
+
+            div[data-testid="stSegmentedControl"] button[aria-pressed="true"],
+            div[data-testid="stSegmentedControl"] button[aria-selected="true"] {
+                background: var(--accent) !important;
+                color: #050605 !important;
             }
 
             h1, h2, h3 {
@@ -134,11 +275,11 @@ def inject_styles() -> None:
                 padding: 1.05rem 1.1rem 1rem 1.1rem;
                 margin-bottom: 0.85rem;
                 border: 1px solid var(--line);
-                border-radius: 10px;
+                border-radius: 16px;
                 background:
-                    linear-gradient(135deg, rgba(255,191,56,0.12), transparent 38%),
+                    linear-gradient(135deg, var(--accent-wash), transparent 40%),
                     linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
-                    #10110e;
+                    var(--panel);
             }
 
             .app-title {
@@ -156,6 +297,27 @@ def inject_styles() -> None:
                 margin-top: 0.3rem;
             }
 
+            .league-stamp {
+                min-width: 150px;
+                text-align: right;
+            }
+
+            .league-stamp span {
+                color: var(--muted);
+                display: block;
+                font-size: 0.7rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+            }
+
+            .league-stamp strong {
+                color: var(--accent);
+                display: block;
+                font-family: "Rajdhani", sans-serif;
+                font-size: 2.6rem;
+                line-height: 0.9;
+            }
+
             .status-strip {
                 display: flex;
                 flex-wrap: wrap;
@@ -169,7 +331,7 @@ def inject_styles() -> None:
                 align-items: center;
                 min-height: 28px;
                 border: 1px solid var(--line);
-                background: rgba(8,8,7,0.36);
+                background: rgba(8,8,7,0.30);
                 color: rgba(243,245,237,0.78);
                 border-radius: 6px;
                 padding: 0.28rem 0.55rem;
@@ -179,10 +341,10 @@ def inject_styles() -> None:
 
             .games-band {
                 border: 1px solid var(--line);
-                border-radius: 10px;
+                border-radius: 16px;
                 background:
                     linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01)),
-                    #10120f;
+                    var(--panel);
                 padding: 0.85rem;
                 margin-bottom: 1.05rem;
             }
@@ -217,7 +379,7 @@ def inject_styles() -> None:
                 border: 1px solid rgba(242,238,218,0.12);
                 border-radius: 9px;
                 background:
-                    linear-gradient(135deg, rgba(133,255,76,0.08), transparent 44%),
+                    linear-gradient(135deg, var(--accent-wash), transparent 44%),
                     #0b0d0a;
                 padding: 0.72rem;
                 overflow: hidden;
@@ -272,8 +434,8 @@ def inject_styles() -> None:
             }
 
             .versus-mark {
-                color: var(--amber);
-                border: 1px solid rgba(255,191,56,0.28);
+                color: var(--accent-3);
+                border: 1px solid color-mix(in srgb, var(--accent-3) 34%, transparent);
                 border-radius: 6px;
                 padding: 0.22rem 0.36rem;
                 font-size: 0.82rem;
@@ -321,7 +483,7 @@ def inject_styles() -> None:
             }
 
             .board-count {
-                color: var(--green);
+                color: var(--accent);
                 font-family: "Rajdhani", sans-serif;
                 font-size: 1.2rem;
                 white-space: nowrap;
@@ -501,7 +663,7 @@ def inject_styles() -> None:
             }
 
             .method-step {
-                color: var(--green);
+                color: var(--accent);
                 font-family: "Rajdhani", sans-serif;
                 text-transform: uppercase;
                 font-size: 1.05rem;
@@ -528,6 +690,9 @@ def inject_styles() -> None:
             button[kind="primary"] {
                 border-radius: 6px !important;
                 font-weight: 700 !important;
+                background: var(--accent) !important;
+                color: #050605 !important;
+                border-color: var(--accent) !important;
             }
 
             .stTabs [data-baseweb="tab-list"] {
@@ -546,6 +711,15 @@ def inject_styles() -> None:
                     flex-direction: column;
                 }
 
+                .league-switch-shell {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+
+                .league-stamp {
+                    text-align: left;
+                }
+
                 .status-strip {
                     justify-content: flex-start;
                 }
@@ -555,9 +729,50 @@ def inject_styles() -> None:
                 }
             }
         </style>
-        """,
-        unsafe_allow_html=True,
+    """
+    for token, value in {
+        "__BG__": theme["bg"],
+        "__PANEL__": theme["panel"],
+        "__PANEL_2__": theme["panel_2"],
+        "__SIDEBAR__": theme["sidebar"],
+        "__ACCENT__": theme["accent"],
+        "__ACCENT_2__": theme["accent_2"],
+        "__ACCENT_3__": theme["accent_3"],
+        "__APP_WASH__": theme["app_wash"],
+        "__ACCENT_WASH__": theme["accent_wash"],
+        "__SIDEBAR_WASH__": theme["sidebar_wash"],
+    }.items():
+        css = css.replace(token, value)
+    st.markdown(css, unsafe_allow_html=True)
+
+
+def render_html(markup: str) -> None:
+    st.html(markup)
+
+
+def render_league_switch(current_league: str) -> str:
+    selected = normalize_sport(current_league)
+    render_html(
+        f"""
+        <div class="league-switch-shell">
+            <div>
+                <div class="league-switch-title">Market Board</div>
+                <div class="league-switch-copy">Choose the league before the live scan, game strip, and historical cache are evaluated.</div>
+            </div>
+            <div class="league-active-pill">{html.escape(selected)} selected</div>
+        </div>
+        """
     )
+    choice = st.segmented_control(
+        "Select league",
+        options=LEAGUE_OPTIONS,
+        default=selected,
+        required=True,
+        label_visibility="collapsed",
+        width="content",
+        key="league_switch",
+    )
+    return normalize_sport(choice)
 
 
 def render_badges(badges: list[tuple[str, str]]) -> None:
@@ -567,7 +782,7 @@ def render_badges(badges: list[tuple[str, str]]) -> None:
         f'<span class="badge badge-{html.escape(tone)}">{html.escape(label)}</span>'
         for label, tone in badges
     )
-    st.markdown(f'<div class="badge-row">{markup}</div>', unsafe_allow_html=True)
+    render_html(f'<div class="badge-row">{markup}</div>')
 
 
 def render_metric_row(cards: list[dict[str, str]]) -> None:
@@ -581,40 +796,40 @@ def render_metric_row(cards: list[dict[str, str]]) -> None:
 
 
 def render_notice(title: str, body: str, tone: str = "gold") -> None:
-    st.markdown(
+    render_html(
         f"""
         <div class="notice notice-{html.escape(tone)}">
             <div class="notice-title">{html.escape(title)}</div>
             <div class="notice-copy">{html.escape(body)}</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_section_header(title: str, copy: str) -> None:
-    st.markdown(
+    render_html(
         f"""
         <div class="section-title">{html.escape(title)}</div>
         <div class="section-copy">{html.escape(copy)}</div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_app_header(status_items: list[str], league: str) -> None:
     chips = "".join(f'<span class="status-chip">{html.escape(item)}</span>' for item in status_items if item)
-    st.markdown(
+    render_html(
         f"""
         <div class="app-header">
             <div>
                 <div class="app-title">Prop Edge Board</div>
                 <div class="app-subtitle">Live {html.escape(league)} prop market board for points, rebounds, assists, and combo lines.</div>
             </div>
-            <div class="status-strip">{chips}</div>
+            <div>
+                <div class="league-stamp"><span>Active league</span><strong>{html.escape(league)}</strong></div>
+                <div class="status-strip">{chips}</div>
+            </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -663,7 +878,7 @@ def render_games_strip(games: pd.DataFrame, game_date_label: str, league: str, e
                 """
             )
         body = f'<div class="games-grid">{"".join(tiles)}</div>'
-    st.markdown(
+    render_html(
         f"""
         <div class="games-band">
             <div class="games-head">
@@ -672,13 +887,12 @@ def render_games_strip(games: pd.DataFrame, game_date_label: str, league: str, e
             </div>
             {body}
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
 def render_board_header(row_count: int) -> None:
-    st.markdown(
+    render_html(
         f"""
         <div class="board-head">
             <div>
@@ -687,8 +901,7 @@ def render_board_header(row_count: int) -> None:
             </div>
             <div class="board-count">{row_count} shown</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -700,7 +913,7 @@ def render_selected_prop_card(row: pd.Series) -> None:
     rolling_text = format_number(row.get("rolling_avg_10"))
     consensus_text = format_number(row.get("consensus_line", row.get("line")))
     score_text = format_number(row.get("scanner_score", row.get("overall_prop_analysis_score", 0.0)))
-    st.markdown(
+    render_html(
         f"""
         <div class="detail-panel">
             <div class="detail-kicker">Selected prop</div>
@@ -720,8 +933,7 @@ def render_selected_prop_card(row: pd.Series) -> None:
             <div class="detail-kicker">Read</div>
             <div class="detail-copy">{html.escape(str(row.get('explanation_text', 'No explanation available.')))}</div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
@@ -1101,9 +1313,6 @@ def player_split_table(player_history: pd.DataFrame, split_col: str) -> pd.DataF
     split["over_hit_rate_pct"] = (split["over_hit_rate"] * 100.0).round(1)
     return split[["segment", "games", "avg_line", "avg_actual", "mean_error", "over_hit_rate_pct"]].sort_values("games", ascending=False)
 
-
-inject_styles()
-
 saved_settings = load_user_settings()
 saved_api_key = str(saved_settings.get("api_key") or os.getenv("THE_ODDS_API_KEY", "")).strip()
 saved_bookmakers = [key for key in saved_settings.get("bookmakers", []) if key in BOOKMAKER_OPTIONS] or list(BOOKMAKER_OPTIONS.keys())[:5]
@@ -1113,22 +1322,23 @@ saved_league = normalize_sport(saved_settings.get("league", "NBA"))
 auto_refresh_enabled = bool(saved_settings.get("auto_refresh", True))
 auto_refresh_minutes = int(saved_settings.get("auto_refresh_minutes", 20))
 
+initial_league = normalize_sport(st.session_state.get("league_switch", saved_league))
+inject_styles(initial_league)
+selected_league = render_league_switch(initial_league)
+if selected_league != saved_league:
+    saved_settings = {**saved_settings, "league": selected_league}
+    save_user_settings(saved_settings)
+    saved_league = selected_league
+
 if "last_history_sync_signature" not in st.session_state:
     st.session_state["last_history_sync_signature"] = None
 if "last_live_sync_display" not in st.session_state:
     st.session_state["last_live_sync_display"] = ""
 
 with st.sidebar:
-    active_view = st.radio("View", options=["Board", "History", "Player", "Method"], index=0)
-    league_choice = st.radio(
-        "League",
-        options=LEAGUE_OPTIONS,
-        index=LEAGUE_OPTIONS.index(saved_league),
-        horizontal=True,
-    )
-    selected_league = normalize_sport(league_choice)
-    st.markdown("---")
-    st.markdown("## Feed")
+    render_html(f'<div class="sidebar-brand"><span>{html.escape(selected_league)}</span> Prop Desk</div>')
+    active_view = st.radio("Workspace", options=["Board", "History", "Player", "Method"], index=0)
+    render_html('<div class="side-section-label">Live feed</div>')
     refresh_live = st.button("Run live scan now", width="stretch", type="primary")
     if st.session_state.get("last_live_sync_display"):
         st.caption(f"Last successful sync: {st.session_state['last_live_sync_display']}")
@@ -1155,8 +1365,7 @@ with st.sidebar:
         auto_refresh_input = st.toggle("Auto refresh live board", value=auto_refresh_enabled)
         save_settings_clicked = st.form_submit_button("Save settings", width="stretch")
     st.caption("Saved locally. Use Run for an immediate refresh.")
-    st.markdown("---")
-    st.markdown("## Board Filters")
+    render_html('<div class="side-section-label">Board filters</div>')
     venue_filter = st.selectbox("Venue", options=["All", "Home", "Away"])
     min_sample = st.slider("History sample min", min_value=5, max_value=50, value=APP_CONFIG.min_segment_samples, step=5)
     player_search = st.text_input("Player search", placeholder="Type part of a player name")
@@ -1272,6 +1481,7 @@ team_options = sorted(
 )
 
 with st.sidebar:
+    render_html('<div class="side-section-label">Market scope</div>')
     prop_type_filter = st.multiselect(
         "Displayed prop markets",
         options=list(PROP_MARKET_MAP.keys()),
@@ -1307,7 +1517,6 @@ except Exception as exc:
     today_games_error = str(exc)
 
 status_parts = [
-    selected_league,
     f"{history_source_label}",
     f"{live_book_count} books",
     f"{live_prop_count} live lines",
@@ -1726,7 +1935,7 @@ if active_view == "Method":
         "The app is designed to be easier to operate than to explain. This page keeps the logic plain: where the data comes from, what the score is, and where the limits still are.",
     )
 
-    st.markdown(
+    render_html(
         """
         <div class="method-grid">
             <div class="method-card">
@@ -1745,8 +1954,7 @@ if active_view == "Method":
                 <div class="method-copy">The History and Player pages show whether certain lines or contexts have actually looked beatable before, and whether those trends stayed stable later in the sample.</div>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
     render_metric_row(
