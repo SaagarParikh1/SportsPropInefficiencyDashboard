@@ -1313,8 +1313,32 @@ def player_split_table(player_history: pd.DataFrame, split_col: str) -> pd.DataF
     split["over_hit_rate_pct"] = (split["over_hit_rate"] * 100.0).round(1)
     return split[["segment", "games", "avg_line", "avg_actual", "mean_error", "over_hit_rate_pct"]].sort_values("games", ascending=False)
 
+
+def read_streamlit_secret(name: str) -> str:
+    try:
+        return str(st.secrets.get(name, "") or "").strip()
+    except Exception:
+        return ""
+
+
+def resolve_api_key(settings: dict[str, Any]) -> tuple[str, str]:
+    candidates = [
+        ("local settings", settings.get("api_key", "")),
+        ("environment variable", os.getenv("THE_ODDS_API_KEY", "")),
+        ("environment variable", os.getenv("ODDS_API_KEY", "")),
+        ("Streamlit secrets", read_streamlit_secret("THE_ODDS_API_KEY")),
+        ("Streamlit secrets", read_streamlit_secret("ODDS_API_KEY")),
+    ]
+    for source, value in candidates:
+        key = str(value or "").strip()
+        if key:
+            return key, source
+    return "", ""
+
+
 saved_settings = load_user_settings()
-saved_api_key = str(saved_settings.get("api_key") or os.getenv("THE_ODDS_API_KEY", "")).strip()
+saved_api_key, api_key_source = resolve_api_key(saved_settings)
+stored_api_key = str(saved_settings.get("api_key", "") or "").strip()
 saved_bookmakers = [key for key in saved_settings.get("bookmakers", []) if key in BOOKMAKER_OPTIONS] or list(BOOKMAKER_OPTIONS.keys())[:5]
 saved_fetch_prop_types = [prop for prop in saved_settings.get("prop_types", []) if prop in PROP_MARKET_MAP] or list(PROP_MARKET_MAP.keys())
 saved_days_ahead = int(saved_settings.get("days_ahead", 1))
@@ -1343,12 +1367,27 @@ with st.sidebar:
     if st.session_state.get("last_live_sync_display"):
         st.caption(f"Last successful sync: {st.session_state['last_live_sync_display']}")
     with st.form("feed_settings_form"):
-        api_key_input = st.text_input(
-            "API key",
-            value=saved_api_key,
-            type="password",
-            help="Saved locally so the app can auto-load live props on future runs.",
-        )
+        replace_api_key = False
+        api_key_input = stored_api_key
+        if saved_api_key:
+            st.caption(f"API key connected automatically from {api_key_source}.")
+            replace_api_key = st.toggle("Replace API key", value=False)
+            if replace_api_key:
+                api_key_input = st.text_input(
+                    "New API key",
+                    value="",
+                    type="password",
+                    help="Only use this if you want to replace the saved local key.",
+                )
+        else:
+            st.caption("API key not found. Add it once here, or set THE_ODDS_API_KEY / Streamlit secrets.")
+            replace_api_key = True
+            api_key_input = st.text_input(
+                "API key",
+                value="",
+                type="password",
+                help="Saved locally after submit so future runs load automatically.",
+            )
         bookmaker_input = st.multiselect(
             "Sportsbooks",
             options=list(BOOKMAKER_OPTIONS.keys()),
@@ -1371,9 +1410,10 @@ with st.sidebar:
     player_search = st.text_input("Player search", placeholder="Type part of a player name")
 
 if save_settings_clicked:
+    api_key_to_save = api_key_input.strip() if replace_api_key else stored_api_key
     save_user_settings(
         {
-            "api_key": api_key_input.strip(),
+            "api_key": api_key_to_save,
             "bookmakers": bookmaker_input,
             "prop_types": fetch_prop_input or list(PROP_MARKET_MAP.keys()),
             "days_ahead": days_ahead_input,
@@ -1533,7 +1573,7 @@ if active_view == "Board":
     if not api_key:
         render_notice(
             "Live scan is off",
-            "Add a The Odds API key in the sidebar to pull live sportsbook props directly into the app. If you set THE_ODDS_API_KEY in your environment, the board will populate automatically on load.",
+            "No Odds API key was found in local settings, THE_ODDS_API_KEY, ODDS_API_KEY, or Streamlit secrets. Add it once in the sidebar and the app will load it automatically after that.",
             tone="gold",
         )
     elif live_error:
